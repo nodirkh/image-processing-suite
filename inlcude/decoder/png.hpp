@@ -16,6 +16,17 @@ namespace decode
 static const std::vector<uint8_t> PNG_MAGIC = {0x89, 0x50, 0x4E, 0x47,
                                                0x0D, 0x0A, 0x1A, 0x0A};
 
+static inline uint32_t calculateCRC(const std::vector<uint8_t>& Data, const std::string& Type)
+{
+    const size_t CSize = Data.size();
+    
+    std::vector<uint8_t> DataCRC(4 + CSize);
+    std::memcpy(DataCRC.data(), Type.data(), 4);
+    std::memcpy(DataCRC.data(), Data.data(), CSize);
+
+    return static_cast<uint32_t>(crc32(0, DataCRC.data(), DataCRC.size()));
+}
+
 class ByteReader
 {
    public:
@@ -96,7 +107,11 @@ class PNG
             return false;
         }
 
-
+        if (!ReadValidPNG())
+        {
+            printf("Corrupted File! \n");
+            return false;
+        }
     }
 
    private:
@@ -105,6 +120,7 @@ class PNG
     ByteReader *Reader;
     std::ifstream File;
     Color color;
+    std::vector<uint8_t> PNGData;
 
     bool ReadPNGHeader()
     {
@@ -136,13 +152,7 @@ class PNG
 
         auto ReadCRC = Reader->u32_be();
 
-        std::vector<uint8_t> DataCRC(4 + ChunkSize);
-        std::memcpy(DataCRC.data(), Type.data(), 4);
-        std::memcpy(DataCRC.data(), Data.data(), ChunkSize);
-
-        uint32_t CalculatedCRC = crc32(0, DataCRC.data(), DataCRC.size());
-
-        if (CalculatedCRC != ReadCRC)
+        if (calculateCRC(Data, Type) != ReadCRC)
         {
             return false;
         }
@@ -161,9 +171,14 @@ class PNG
             auto ChunkSize = Reader->u32_be();
             auto Type = Reader->str(4);
 
-            
-
             if ("IEND" == Type) break;
+
+            auto ReadData = Reader->bytes(ChunkSize);
+            
+            if ("IDAT" == Type)
+            {
+                PNGData.insert(PNGData.end(), ReadData.begin(), ReadData.end());
+            }
         }
     }
 };
