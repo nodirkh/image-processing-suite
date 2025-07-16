@@ -25,16 +25,17 @@ class Image
     Image(const Image&);
     Image& operator=(const Image&);
 
-    T& at(size_t, size_t, size_t) const;
-    T at(size_t, size_t, size_t) const;
+    const T& At(size_t, size_t, size_t) const;
+    T At(size_t, size_t, size_t);
+    T& At(size_t, size_t, size_t);
 
-    size_t width() const;
-    size_t height() const;
-    size_t channel() const;
+    size_t Width() const;
+    size_t Height() const;
+    size_t Channel() const;
 
-    void createImage(T*);
+    void CreateImage(T*);
 
-    size_t size() const;
+    size_t Size() const;
 
    private:
     size_t w, h, c;

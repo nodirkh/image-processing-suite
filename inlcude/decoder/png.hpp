@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <fstream>
 #include <iostream>
+#include <tuple>
 #include <vector>
 
 namespace ips
@@ -22,8 +23,8 @@ static inline uint32_t calculateCRC(const std::vector<uint8_t> &Data,
     const size_t CSize = Data.size();
 
     std::vector<uint8_t> DataCRC(4 + CSize);
-    std::memcpy(DataCRC.data(), Type.data(), 4);
-    std::memcpy(DataCRC.data(), Data.data(), CSize);
+    memcpy(DataCRC.data(), Type.data(), 4);
+    memcpy(DataCRC.data(), Data.data(), CSize);
 
     return static_cast<uint32_t>(crc32(0, DataCRC.data(), DataCRC.size()));
 }
@@ -102,12 +103,10 @@ class PNG
 
     ~PNG()
     {
-        if (Reader)
-            delete Reader;
+        if (Reader) delete Reader;
         Reader = nullptr;
 
-        if (File.is_open())
-            File.close();
+        if (File.is_open()) File.close();
     }
 
     bool Open(const std::string &path)
@@ -159,6 +158,7 @@ class PNG
     std::ifstream File;
     Color color;
     std::vector<uint8_t> PNGData;
+    std::vector<std::tuple<uint8_t, uint8_t, uint8_t>> PLTE;
 
     bool ReadPNGHeader()
     {
@@ -219,6 +219,24 @@ class PNG
             if ("IDAT" == Type)
             {
                 PNGData.insert(PNGData.end(), ReadData.begin(), ReadData.end());
+            }
+
+            if ("PLTE" == Type)
+            {
+                if (ReadData.size() % 3 != 0)
+                    return false;  // Corrupted palette
+
+                PLTE.clear();
+                for (size_t i = 0; i < ReadData.size(); i += 3)
+                {
+                    uint8_t r = ReadData[i];
+                    uint8_t g = ReadData[i + 1];
+                    uint8_t b = ReadData[i + 2];
+                    PLTE.emplace_back(r, g, b);
+                }
+
+                // Skip CRC
+                continue;
             }
 
             if (calculateCRC(ReadData, Type) != ReadCRC)
@@ -340,7 +358,11 @@ class PNG
         std::vector<uint8_t> PrevData(Width * BytesPerPixel, 0);
 
         std::vector<uint8_t> Output;
-        Output.reserve(Width * Height * BytesPerPixel);
+        
+        if (3 == CType)
+            Output.reserve(Width * Height * 3);
+        else
+            Output.reserve(Width * Height * BytesPerPixel);
 
         int Row = 0;
         for (Row; Row < Height; ++Row)
@@ -355,7 +377,20 @@ class PNG
             if (!ApplyPNGFilter(FilterType, RowData, RowLen, PrevData))
                 return false;
 
-            Output.insert(Output.end(), RowData.begin(), RowData.end());
+            if (3 == CType)
+            {
+                for (uint8_t index : RowData)
+                {
+                    if (index >= PLTE.size()) return false;
+
+                    auto [r, g, b] = PLTE[index];
+                    Output.push_back(r);
+                    Output.push_back(g);
+                    Output.push_back(b);
+                }
+            }
+            else
+                Output.insert(Output.end(), RowData.begin(), RowData.end());
 
             PrevData = std::move(RowData);
         }
