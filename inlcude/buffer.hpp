@@ -25,6 +25,8 @@ class Buffer
 
     static constexpr size_t TypeSize = sizeof(Type);
 
+    public:
+
     Buffer()
     {
         size_ = 0;
@@ -36,7 +38,7 @@ class Buffer
     {
     }
 
-    explicit Buffer(size_t elements, const Type* Source)
+    explicit Buffer(size_t elements, Type* Source)
     {
         CreateBuffer(Source, elements);
     }
@@ -107,7 +109,7 @@ class Buffer
     void CreateBuffer(Type* Source, size_t Size)
     {
         delete[] data_;
-        data_ = new Type[count];
+        data_ = new Type[Size];
         size_ = Size;
 
         if constexpr (std::is_trivially_copyable<Type>::value)
@@ -116,13 +118,13 @@ class Buffer
         }
         else
         {
-            for (size_t i = 0; i < Size; ++i) data_[i] = source[i];
+            for (size_t i = 0; i < Size; ++i) data_[i] = Source[i];
         }
     }
 
    private:
-    size_t size_;
-    Pointer data_;
+    size_t size_ = 0;
+    Pointer data_ = nullptr;
 };
 
 }  // namespace detail
